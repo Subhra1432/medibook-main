@@ -24,15 +24,38 @@ app.use(require('./middleware/errorHandler'));
 
 // Connect to MongoDB and start server
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/medibook';
+const IS_RENDER = Boolean(process.env.RENDER);
+const MONGO_URI = process.env.MONGO_URI || (IS_RENDER ? '' : 'mongodb://127.0.0.1:27017/medibook');
+const MONGO_RETRY_MS = Number(process.env.MONGO_RETRY_MS || 10000);
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
+if (!MONGO_URI) {
+  console.error('❌ Missing MONGO_URI environment variable. Set it in your Render service environment.');
+  process.exit(1);
+}
+
+let mongoReady = false;
+
+async function connectMongoWithRetry() {
+  try {
+    await mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 10000 });
+    mongoReady = true;
     console.log('✅ MongoDB connected');
-    app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection failed:', err.message);
-    process.exit(1);
+  } catch (err) {
+    mongoReady = false;
+    console.error(`❌ MongoDB connection failed: ${err.message}`);
+    console.error(`↻ Retrying MongoDB connection in ${MONGO_RETRY_MS}ms`);
+    setTimeout(connectMongoWithRetry, MONGO_RETRY_MS);
+  }
+}
+
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    mongo: mongoReady ? 'connected' : 'disconnected',
   });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  connectMongoWithRetry();
+});
