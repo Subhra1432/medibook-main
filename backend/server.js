@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -14,13 +16,26 @@ app.use('/api/doctors', require('./routes/doctors'));
 app.use('/api/appointments', require('./routes/appointments'));
 app.use('/api/patients', require('./routes/patients'));
 
-// Health check
-app.get('/', (req, res) => {
+// API status
+app.get('/api/status', (req, res) => {
   res.json({ message: 'MediBook API is running 🏥', version: '1.0.0' });
 });
 
-// Error handler
-app.use(require('./middleware/errorHandler'));
+const frontendDistPath = path.resolve(__dirname, '../frontend/dist');
+const hasFrontendBuild = fs.existsSync(frontendDistPath);
+
+if (hasFrontendBuild) {
+  app.use(express.static(frontendDistPath));
+
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/healthz') return next();
+    return res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.json({ message: 'MediBook API is running 🏥', version: '1.0.0' });
+  });
+}
 
 // Connect to MongoDB and start server
 const PORT = process.env.PORT || 5000;
@@ -54,6 +69,9 @@ app.get('/healthz', (_req, res) => {
     mongo: mongoReady ? 'connected' : 'disconnected',
   });
 });
+
+// Error handler
+app.use(require('./middleware/errorHandler'));
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
