@@ -1,8 +1,14 @@
 {
-  "dependencies": {
-    "@supabase/supabase-js": "^2.105.4",
-    "dotenv": "^17.4.2",
-    "mongoose": "^9.6.2",
-    "pg": "^8.20.0"
+  "name": "medibook-main",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "dev": "npm --prefix backend run dev",
+    "seed": "npm --prefix backend run seed"
   }
 }
